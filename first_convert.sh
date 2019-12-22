@@ -1,0 +1,1 @@
+python scripts/convert_glove2numpy.py ../fasttext/skip_s100.txt

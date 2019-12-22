@@ -1,0 +1,8 @@
+{
+    "train": [
+        {
+            "embedding_path": "data/skip_s100.npy",
+            "embedding_target": "data/mymodel"
+        }  
+    ]
+}
