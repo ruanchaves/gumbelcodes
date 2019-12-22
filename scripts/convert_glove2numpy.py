@@ -16,10 +16,15 @@ if __name__ == '__main__':
 
     lines = list(open(glove_path))
     embed_matrix = np.zeros((len(lines), args.dim), dtype='float32')
+    print(embed_matrix.shape)
     for i, line in enumerate(lines):
-        parts = line.rstrip().split(' ')
+        parts = line.strip().split(' ')
         word = parts[0]
         vec = np.array(parts[1:], dtype='float32')
-        embed_matrix[i] = vec
+        try:
+            embed_matrix[i] = vec
+        except:
+            print(i)
+            continue
         f_wordout.write(word + "\n")
     np.save(embed_path, embed_matrix)
