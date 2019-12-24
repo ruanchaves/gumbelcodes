@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import matutils
+from .matutils import matrix_vector_multiply, unitvec
 import marisa_trie
 from six import string_types
 
@@ -15,8 +15,8 @@ class CompressedVectors(object):
         self.vectors_even = np.load(vectors) & 0xF
 
     def __getitem__(self, index):
-        odd = matutils.matrix_vector_multiply(self.codebook_vectors_odd, self.vectors_odd[index])
-        even = matutils.matrix_vector_multiply(self.codebook_vectors_even, self.vectors_even[index])
+        odd = matrix_vector_multiply(self.codebook_vectors_odd, self.vectors_odd[index])
+        even = matrix_vector_multiply(self.codebook_vectors_even, self.vectors_even[index])
         return np.sum(np.concatenate((odd, even), axis=0), axis=0)
 
 class BaseKeyedVectors(object):
@@ -193,7 +193,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
             Cosine similarity between `w1` and `w2`.
 
         """
-        return np.dot(matutils.unitvec(self[w1]), matutils.unitvec(self[w2]))
+        return np.dot(unitvec(self[w1]), unitvec(self[w2]))
 
     def n_similarity(self, ws1, ws2):
         """Compute cosine similarity between two sets of words.
@@ -215,7 +215,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
             raise ZeroDivisionError('At least one of the passed list is empty.')
         v1 = [self[word] for word in ws1]
         v2 = [self[word] for word in ws2]
-        return np.dot(matutils.unitvec(np.array(v1).mean(axis=0)), matutils.unitvec(np.array(v2).mean(axis=0)))
+        return np.dot(unitvec(np.array(v1).mean(axis=0)), unitvec(np.array(v2).mean(axis=0)))
 
 class Word2VecKeyedVectors(WordEmbeddingsKeyedVectors):
 
