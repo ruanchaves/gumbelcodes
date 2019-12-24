@@ -9,7 +9,16 @@ import numpy as np
 
 from loguru import logger
 from marisa_trie import Trie
-from nncompress import EmbeddingCompressor
+from embed_compress import EmbeddingCompressor
+
+def encode(x,y):
+    return (x << 4) + y
+
+def create_file(original_path, prefix=''):
+    path = os.path.split(original_path)[0]
+    fname = os.path.split(original_path)[1]
+    fname = prefix + fname
+    return os.path.join(path, fname)
 
 
 class Pipeline(object):
@@ -106,15 +115,6 @@ class Pipeline(object):
         codebook = np.array([codebook_odd, codebook_even], dtype=np.float32)
 
         np.save(create_file(codebook_path, 'trimmed_'), codebook)
-
-def encode(x,y):
-    return (x << 4) + y
-
-def create_file(original_path, prefix=''):
-    path = os.path.split(original_path)[0]
-    fname = os.path.split(original_path)[1]
-    fname = prefix + fname
-    return os.path.join(path, fname)
 
 if __name__ == '__main__':
     with open(sys.argv[1],'r') as f:
