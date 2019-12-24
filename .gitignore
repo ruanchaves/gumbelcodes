@@ -1,3 +1,13 @@
+#Setup
+env.sh
+docker.sh
+
+#Data
+data/
+
+#Virtualenv
+small/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
