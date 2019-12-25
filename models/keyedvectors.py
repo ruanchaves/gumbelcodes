@@ -2,22 +2,22 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-from .matutils import matrix_vector_multiply, unitvec
+from .matutils import unitvec
 import marisa_trie
 from six import string_types
 
 class CompressedVectors(object):
     def __init__(self, vectors, codebook):
         self.codebook = np.load(codebook)
-        self.codebook_vectors_odd = self.codebook[0] 
-        self.codebook_vectors_even = self.codebook[1]
-        self.vectors_odd = np.load(vectors) << 4
-        self.vectors_even = np.load(vectors) & 0xF
+        self.codebook_vectors_even = self.codebook[0].T
+        self.codebook_vectors_odd = self.codebook[1].T
+        self.vectors_even = np.load(vectors) >> 4
+        self.vectors_odd = np.load(vectors) & 0xF
 
     def __getitem__(self, index):
-        odd = matrix_vector_multiply(self.codebook_vectors_odd, self.vectors_odd[index])
-        even = matrix_vector_multiply(self.codebook_vectors_even, self.vectors_even[index])
-        return np.sum(np.concatenate((odd, even), axis=0), axis=0)
+        odd = (self.codebook_vectors_odd * self.vectors_odd[index]).T
+        even = (self.codebook_vectors_even * self.vectors_even[index]).T
+        return np.sum(even,axis=0) + np.sum(odd, axis=0)
 
 class BaseKeyedVectors(object):
     """Abstract base class / interface for various types of word vectors."""

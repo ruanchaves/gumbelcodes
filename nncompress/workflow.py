@@ -11,15 +11,22 @@ from loguru import logger
 from marisa_trie import Trie
 from embed_compress import EmbeddingCompressor
 
-def encode(x,y):
-    return (x << 4) + y
-
 def create_file(original_path, prefix=''):
     path = os.path.split(original_path)[0]
     fname = os.path.split(original_path)[1]
     fname = prefix + fname
     return os.path.join(path, fname)
 
+def matrix_bincount(A):
+    N = A.max()+1
+    idx = A + (N*np.arange(A.shape[0]))[:,None]
+    return N, np.bincount(idx.ravel(),minlength=N*A.shape[0]).reshape(-1,N)
+
+def bitpack_uint8_matrix(A):
+    even = A.astype(np.uint8) << 4 
+    odd = np.pad(A[..., 1:], ((0,0), (0,1))).astype(np.uint8)
+    pack = even + odd
+    return pack[:, ::2]
 
 class Pipeline(object):
 
@@ -88,31 +95,27 @@ class Pipeline(object):
         codes_path = self.codebook_prefix + suffix
         codes = np.loadtxt(codes_path)
         codes = codes.astype(dtype=np.int64)
-        max_value = np.max(codes.flatten())
+        max_value = codes.max()
 
-        assert(not [x for x in codes if len(x) != len(codes[0])])
-        assert(max_value < len(codes[0]) )
+        assert((codes == codes[0]).all())
+        assert(max_value < len(codes[0]))
 
-        new_codes = np.array([ np.bincount(x, minlength=(max_value+1)) for x in codes ], dtype=np.uint8)
-        max_rep = np.max(new_codes.flatten())
+        max_rep, codes = matrix_bincount(codes)
 
         assert(max_value < 16)
         assert(max_rep < 16)
 
-        new_codes = [ [ x[idx:idx+2] for idx in range(0,len(x), 2) ] for x in new_codes ]
-        new_codes = [ np.array([ encode(*y) for y in x ],dtype=np.uint8) for x in new_codes ]
-        new_codes = np.array(new_codes, dtype=np.uint8)
+        codes = bitpack_uint8_matrix(codes)
 
-        np.save(create_file(codes_path, 'trimmed_'), new_codes)
-
+        np.save(create_file(codes_path, 'trimmed_'), codes)
 
         codebook_path = self.codebook_prefix + '.codebook.npy'
         codebook = np.load(codebook_path)
         array_length = max_value + 1
         codebook = codebook[0:array_length]
-        codebook_odd = np.array(codebook[::2], dtype=np.float32)
-        codebook_even = np.array(codebook[1::2], dtype=np.float32)
-        codebook = np.array([codebook_odd, codebook_even], dtype=np.float32)
+        codebook_even = np.array(codebook[::2], dtype=np.float32)
+        codebook_odd = np.array(codebook[1::2], dtype=np.float32)
+        codebook = np.array([codebook_even, codebook_odd], dtype=np.float32)
 
         np.save(create_file(codebook_path, 'trimmed_'), codebook)
 
@@ -121,8 +124,10 @@ if __name__ == '__main__':
         settings = json.load(f)
     for entry in settings: 
         pipe = Pipeline(**entry)
+        # pipe\
+        #     .get_words(generate_dictionary=False)\
+        #     .get_embeddings()\
+        #     .train()\
+        #     .trim()
         pipe\
-            .get_words(generate_dictionary=False)\
-            .get_embeddings()\
-            .train()\
             .trim()

@@ -9,9 +9,6 @@
 import numpy as np
 from scipy.linalg import get_blas_funcs
 
-def matrix_vector_multiply(m,c):
-    return (m.T * c).T
-
 def blas(name, ndarray):
     """Helper for getting the appropriate BLAS function, using :func:`scipy.linalg.get_blas_funcs`.
 
