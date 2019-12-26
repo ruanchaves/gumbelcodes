@@ -14,6 +14,41 @@ def bitpack_uint8_matrix(A):
     pack = even + odd
     return pack[:, ::2]
 
+def trim(codes_path, codebook_path, target_path):
+    codes = np.loadtxt(codes_path)
+    codes = codes.astype(dtype=np.int64)
+    max_value = codes.max()
+    min_value = codes.min()
+
+    assert(max_value < len(codes[0]))
+
+    max_rep, codes = matrix_bincount(codes)
+
+    try:
+        assert(max_value < 16)
+    except:
+        logger.debug("{0} : min_value = {1}, max_value = {2}".format(self.codebook_prefix, min_value, max_value))
+        Exception('Out of range')
+
+    try:
+        assert(max_rep < 16)
+    except:
+        codes[codes > 15] = 15
+        logger.debug("{0} : max_rep = {1} - rounded down to 15".format(self.codebook_prefix, max_rep))
+
+    codes = bitpack_uint8_matrix(codes)
+
+    codebook_path = self.codebook_prefix + '.codebook.npy'
+    codebook = np.load(codebook_path)
+    array_length = max_value + 1
+    codebook = codebook[0:array_length]
+    np.savez_compressed(target_path, codes=codes, codebook=codebook)
+
+def split_codebook(codebook):
+    codebook_even = np.array(codebook[::2], dtype=np.float32)
+    codebook_odd = np.array(codebook[1::2], dtype=np.float32)
+    return np.array([codebook_even, codebook_odd], dtype=np.float32)
+
 def blas(name, ndarray):
     """Helper for getting the appropriate BLAS function, using :func:`scipy.linalg.get_blas_funcs`.
 

@@ -20,7 +20,6 @@ class PipelineTemplate(object):
                  dimension=None,
                  source_path=None,
                  target_path=None,
-                 words_path=None,
                  words_suffix='.words',
                  logging=True):
         self.codebook_prefix = codebook_prefix
@@ -30,7 +29,6 @@ class PipelineTemplate(object):
         self.logging = logging
         self.source_path = source_path
         self.target_path = target_path
-        self.words_path = words_path
         self.words_suffix = words_suffix
 
 

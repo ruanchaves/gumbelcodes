@@ -38,7 +38,7 @@ def compress(codes_path, codebook_path, target_path, logging=True):
 
     np.savez_compressed(target_path, codes=codes, codebook=codebook)
 
-def decompress(npz_array_path, target_path):
+def decompress(npz_array_path):
     npz_array = np.load(npz_array_path)
     codes = npz_array['codes']
     codebook = npz_array['codebook']
@@ -46,3 +46,18 @@ def decompress(npz_array_path, target_path):
     for item in codes:
         new_codes.append(np.repeat(np.arange(len(item)), item))
     return np.array(new_codes), codebook
+
+def embedding_file_generator(words_path, codes, codebook, target_path):
+    codebook_transposed = codebook.T
+    with open(words_path,'r') as f:
+        for idx, line in enumerate(f):
+            embedding = ( codebook_transposed * codes[idx] ).T
+            embedding = ' '.join(str(x) for x in embedding)
+            new_line = line.strip() + ' ' + embedding
+            yield new_line
+
+def expand(words_path, codes, codebook, target_path):
+    open(target_path, 'w+').close()
+    with open(target_path, 'a') as f:
+        for item in embedding_file_generator(words_path, codes, codebook, target_path):
+            print(item, file=f)
