@@ -1,0 +1,11 @@
+[
+    {
+        "source_path": "data/glove.6B.300d.txt",
+        "dimension": 300,
+        "target_path": "data/glove.6B.300d.npy",
+        "dictionary_path": "data/glove.6B.300d_dictionary.json",
+        "trie_path": "data/glove.6B.300d_trie.marisa",
+        "codebook_prefix": "data/glove.6B.300d_",
+        "logging": true
+    }
+]

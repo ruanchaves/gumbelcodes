@@ -1,38 +1,42 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import numpy as np
-from .matutils import unitvec
+from gumbelcodes.utils.matutils import unitvec
 import marisa_trie
 from six import string_types
 
 class CompressedVectors(object):
-    def __init__(self, vectors, codebook):
+    def __init__(self, codes, codebook):
+
+        self.codes = np.load(codes)
         self.codebook = np.load(codebook)
-        self.codebook_vectors_even = self.codebook[0].T
-        self.codebook_vectors_odd = self.codebook[1].T
-        self.vectors_even = np.load(vectors) >> 4
-        self.vectors_odd = np.load(vectors) & 0xF
+
+        self.codebook_codes_even = self.codebook[0].T
+        self.codebook_codes_odd = self.codebook[1].T
+
+        self.codes_even = np.load(codes) >> 4
+        self.codes_odd = np.load(codes) & 0xF
 
     def __getitem__(self, index):
-        odd = (self.codebook_vectors_odd * self.vectors_odd[index]).T
-        even = (self.codebook_vectors_even * self.vectors_even[index]).T
+        even = (self.codebook_codes_even * self.codes_even[index]).T
+        odd = (self.codebook_codes_odd * self.codes_odd[index]).T
         return np.sum(even,axis=0) + np.sum(odd, axis=0)
 
-class BaseKeyedVectors(object):
+class BaseKeyedVectorsTemplate(object):
+
+    def __init__(self, *args, codes=None, codebook=None, trie=None, **kwargs):
+        self.codes = codes
+        self.codebook = codebook
+        self.trie = trie
+
+class BaseKeyedVectors(BaseKeyedVectorsTemplate):
     """Abstract base class / interface for various types of word vectors."""
     def __init__(self, *args, **kwargs):
-        self.vectors = None
-        self.codebook = None
-        self.trie = None
-
-        self.__dict__.update(kwargs)
-        self.vectors = CompressedVectors(self.vectors, self.codebook)
+        super(BaseKeyedVectors, self).__init__(*args, **kwargs)
+        self.vectors = CompressedVectors(self.codes, self.codebook)
         self.vocab = marisa_trie.Trie().load(self.trie)
 
     @classmethod
-    def load(cls, *args, **kwargs):
-        return cls(*args, **kwargs)
+    def load(cls, file_or_handle, **kwargs):
+        return cls(file_or_handle, **kwargs)
 
     def get_vector(self, entity):
         """Get the entity's representations in vector space, as a 1D numpy array.
@@ -225,7 +229,7 @@ class Word2VecKeyedVectors(WordEmbeddingsKeyedVectors):
         return model
 
     @classmethod
-    def load(cls, fname_or_handle, *args, **kwargs):
+    def load(cls, *args, **kwargs):
         model = super(Word2VecKeyedVectors, cls).load(*args, **kwargs)
         return model
 

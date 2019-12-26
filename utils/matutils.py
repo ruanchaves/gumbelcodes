@@ -1,13 +1,18 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#
-# Copyright (C) 2011 Radim Rehurek <radimrehurek@seznam.cz>
-# Licensed under the GNU LGPL v2.1 - http://www.gnu.org/licenses/lgpl.html
-
-"""Math helper functions."""
-
 import numpy as np
-from scipy.linalg import get_blas_funcs
+from importlib.util import find_spec
+if find_spec('scipy'):
+    from scipy.linalg import get_blas_funcs
+
+def matrix_bincount(A):
+    N = A.max()+1
+    idx = A + (N*np.arange(A.shape[0]))[:,None]
+    return N, np.bincount(idx.ravel(),minlength=N*A.shape[0]).reshape(-1,N)
+
+def bitpack_uint8_matrix(A):
+    even = A.astype(np.uint8) << 4 
+    odd = np.pad(A[..., 1:], ((0,0), (0,1))).astype(np.uint8)
+    pack = even + odd
+    return pack[:, ::2]
 
 def blas(name, ndarray):
     """Helper for getting the appropriate BLAS function, using :func:`scipy.linalg.get_blas_funcs`.
