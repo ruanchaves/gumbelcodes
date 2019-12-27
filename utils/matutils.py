@@ -1,12 +1,18 @@
 import numpy as np
 from importlib.util import find_spec
-if find_spec('scipy'):
-    from scipy.linalg import get_blas_funcs
+from scipy.linalg import get_blas_funcs
+from loguru import logger
 
 def matrix_bincount(A):
     N = A.max()+1
     idx = A + (N*np.arange(A.shape[0]))[:,None]
     return N, np.bincount(idx.ravel(),minlength=N*A.shape[0]).reshape(-1,N)
+
+def bitunpack_uint8_matrix(A):
+    even = (A.astype(np.uint8) >> 4).T
+    odd = (A.astype(np.uint8) & 0xF).T
+    unpack = np.hstack([even, odd]).reshape(even.shape[0]*2, even.shape[1]).T
+    return unpack.astype(np.uint8)
 
 def bitpack_uint8_matrix(A):
     even = A.astype(np.uint8) << 4 
@@ -14,35 +20,20 @@ def bitpack_uint8_matrix(A):
     pack = even + odd
     return pack[:, ::2]
 
-def trim(codes_path, codebook_path, target_path):
-    codes = np.loadtxt(codes_path)
-    codes = codes.astype(dtype=np.int64)
-    max_value = codes.max()
-    min_value = codes.min()
-
-    assert(max_value < len(codes[0]))
-
-    max_rep, codes = matrix_bincount(codes)
-
+def safe_matrix_bincount(max_value, A, bitsize=16):
+    assert(max_value < len(A[0]))
+    max_rep, A = matrix_bincount(A)
     try:
-        assert(max_value < 16)
+        assert(max_value < bitsize)
     except:
-        logger.debug("{0} : min_value = {1}, max_value = {2}".format(self.codebook_prefix, min_value, max_value))
+        logger.debug("min_value = {0}, max_value = {1}".format(min_value, max_value))
         Exception('Out of range')
-
     try:
-        assert(max_rep < 16)
+        assert(max_rep < bitsize)
     except:
-        codes[codes > 15] = 15
-        logger.debug("{0} : max_rep = {1} - rounded down to 15".format(self.codebook_prefix, max_rep))
-
-    codes = bitpack_uint8_matrix(codes)
-
-    codebook_path = self.codebook_prefix + '.codebook.npy'
-    codebook = np.load(codebook_path)
-    array_length = max_value + 1
-    codebook = codebook[0:array_length]
-    np.savez_compressed(target_path, codes=codes, codebook=codebook)
+        A[A > bitsize - 1] = bitsize - 1
+        logger.debug("max_rep = {0}".format(max_rep))
+    return A
 
 def split_codebook(codebook):
     codebook_even = np.array(codebook[::2], dtype=np.float32)

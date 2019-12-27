@@ -14,12 +14,6 @@ from keras.initializers import Constant
 import re
 import spacy
 
-def parse(x):
-    return ' '.join([y.text for y in nlp(x, disable=['parser', 'tagger', 'ner']) if y.is_alpha])
-
-nlp = en_core_web_sm.load()
-data['sentence'] = data['sentence'].apply(parse)
-
 class Model(object):
     def __init__(self,
                 max_features=20000):
@@ -45,29 +39,25 @@ class Dataset(Model):
         self.nlp = nlp
         self.sentence_header = sentence_header
         self.sentiment_header = sentiment_header
+        self.len_header = len_header
         self.tokenizer = None
         self.word_index = None
 
     def spacy_tokenize(self):
-        self.data[sentence_header] = self.data[sentence_header].apply(parse)
-        self.data[len_header] = self.data[sentence_header].apply(lambda x: len(str(x).split(' ')))
-        self.sequence_length = data[len_header].max() + 1
-        self.max_features = max_features
+        self.data[self.sentence_header] = self.data[self.sentence_header].apply(self.parse)
+        self.data[self.len_header] = self.data[self.sentence_header].apply(lambda x: len(str(x).split(' ')))
+        self.sequence_length = self.data[self.len_header].max() + 1
 
-    def keras_train_test_split(self,
-                split=' ',
-                oov_token='<unw>',
-                filters=' ')
-    self.tokenizer = Tokenizer(num_words=self.max_features, split=split, oov_token=oov_token, filters=filters)
-    self.tokenizer.fit_on_texts(self.data[self.sentence_header].values)
-    X = self.tokenizer.texts_to_sequences(self.data[self.sentence_header].values)
-    X = pad_sequences(X, self.sequence_length)
-    y = pd.get_dummies(self.data[self.sentiment_label]).values
+    def keras_train_test_split(self, split=" ", oov_token="<unw>", filters=" "):
+        self.tokenizer = Tokenizer(num_words=self.max_features, split=split, oov_token=oov_token, filters=filters)
+        self.tokenizer.fit_on_texts(self.data[self.sentence_header].values)
+        X = self.tokenizer.texts_to_sequences(self.data[self.sentence_header].values)
+        X = pad_sequences(X, self.sequence_length)
+        y = pd.get_dummies(self.data[self.sentiment_header]).values
+        self.word_index = self.tokenizer.word_index
+        return train_test_split(X, y, test_size=0.3)
 
-    self.word_index = self.tokenizer.word_index
-    return train_test_split(X, y, test_size=0.3)
-
-    def parse(x):
+    def parse(self,x):
         return ' '.join([y.text for y in self.nlp(x, disable=['parser', 'tagger', 'ner']) if y.is_alpha])
 
 class WordEmbedding(Dataset):
@@ -75,6 +65,7 @@ class WordEmbedding(Dataset):
                 path='data/glove.6B.300d.txt',
                 encoding='utf-8',
                 dtype='float32',
+                dim=300,
                 **kwargs):
         super(WordEmbedding, self).__init__(**kwargs)
         self.path = path
@@ -82,7 +73,9 @@ class WordEmbedding(Dataset):
         self.dtype = dtype
         self.embeddings_index = {}
         self.embedding_matrix = None
+        self.embedding_dim = dim
         self.num_words = None
+        self.word_index = None
 
     def read_embedding(self):
         f = open(self.path, encoding=self.encoding)
@@ -92,13 +85,13 @@ class WordEmbedding(Dataset):
             coefs = np.asarray(values[1:], dtype='float32')
             self.embeddings_index[word] = coefs
         f.close()
-        word_index = tokenizer.word_index
+        self.word_index = self.tokenizer.word_index
 
     def build_embedding_matrix(self):
         self.num_words = min(self.max_features, len(self.word_index)) + 1
         self.embedding_matrix = np.zeros((self.num_words, self.embedding_dim))
-        for word, i in word_index.items():
-            if i > max_features:
+        for word, i in self.word_index.items():
+            if i > self.max_features:
                 continue
             embedding_vector = self.embeddings_index.get(word)
             if embedding_vector is not None:
@@ -114,7 +107,7 @@ class SentimentModel(WordEmbedding):
         super(SentimentModel, self).__init__(**kwargs)
         self.model = None
 
-    def compile(self, units=2, trainable=False):
+    def compile_sentiment_model(self, units=2, trainable=False):
         self.model = Sequential()
         self.model.add(Embedding(self.num_words,
                             self.embedding_dim,
@@ -128,9 +121,13 @@ class SentimentModel(WordEmbedding):
         self.model.add(Dense(units=units, activation='softmax'))
         self.model.compile(loss = 'categorical_crossentropy', optimizer='adam',metrics = ['accuracy'])
 
-    def evaluate(self, X_test, y_test):
-        y_hat = model.predict(X_test)
-        accuracy_score(list(map(lambda x: np.argmax(x), y_test)), list(map(lambda x: np.argmax(x), y_hat)))
+    def fit_sentiment_model(self, X_train, y_train, epochs=5, batch_size=128, verbose=0, validation_split=0.3):
+        history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_split=validation_split)
+        return history
+
+    def evaluate_sentiment_model(self, X_test, y_test):
+        y_hat = self.model.predict(X_test)
+        acc = accuracy_score(list(map(lambda x: np.argmax(x), y_test)), list(map(lambda x: np.argmax(x), y_hat)))
         conf = confusion_matrix(list(map(lambda x: np.argmax(x), y_test)), list(map(lambda x: np.argmax(x), y_hat)))
         tp = conf[0][0]
         fn = conf[0][1]
@@ -142,17 +139,19 @@ class SentimentModel(WordEmbedding):
 
         return {
             "Matthews correlation coefficient" : matthews_correlation_coefficient,
-            "Accuracy score": accuracy_score
+            "Accuracy score": acc
         }
     
 class SentimentPipeline(SentimentModel):
     def __init__(self, **kwargs):
         super(SentimentPipeline, self).__init__(**kwargs)
 
-    def execute(self):
+    def execute_sentiment_pipeline(self):
         self.spacy_tokenize()
-        self.keras_train_test_split()
+        X_train, X_test, y_train, y_test = self.keras_train_test_split()
         self.read_embedding()
         self.build_embedding_matrix()
-        self.compile()
-        return self.evaluate()
+        self.compile_sentiment_model()
+        history = self.fit_sentiment_model(X_train, y_train)
+        result = self.evaluate_sentiment_model(X_test, y_test)
+        return history, result

@@ -4,10 +4,9 @@ import json
 import os
 import sys
 from argparse import ArgumentParser
-from zipfile import ZipFile
-
+import codecs
 import numpy as np
-from embed_compress import EmbeddingCompressor
+from gumbelcodes.nncompress.embed_compress import EmbeddingCompressor
 from loguru import logger
 
 
@@ -54,19 +53,20 @@ class Pipeline(PipelineTemplate):
                 w = parts[0]
                 vec = np.array(parts[1:], dtype='float32')
                 embed_matrix[i] = vec
-                if self.get_words:
+                if get_words:
                     words.append(w)
-            except:
+            except Exception as e:
                 if not ignore_errors:
                     raise Exception("Invalid embedding at line {0}".format(i))
                 if self.logging:
-                    logger.debug(line)
+                    logger.debug(e)
+                    logger.debug(w)
                     logger.debug("Invalid embedding at line {0}".format(i))
         np.save(self.target_path, embed_matrix)
         if get_words:
             fname = self.codebook_prefix + self.words_suffix
             open(fname, 'w+').close()
-            with open(fname, 'a') as f:
+            with codecs.open(fname, 'w', encoding='utf8') as f:
                 for word in words:
                     print(word, file=f)
 
